@@ -5,10 +5,13 @@ cii to correlation matrix functions
 
 #requires: 
 import numpy as np
+import pandas as pd
 from cloudpathlib import S3Path, S3Client
 import nibabel as nib
 import neuropythy as ny
-
+import hcp_utils as hcp
+from nilearn.surface import InMemoryMesh, PolyMesh
+from nilearn.surface import SurfaceImage
 
 def ciis_to_giis(patient_num):
     """
@@ -46,6 +49,47 @@ def ciis_to_giis(patient_num):
 
     #return tuple 
     return (all_left_hemi, all_right_hemi)
+
+def create_mmp_mesh():
+    ''' Creates a mesh based on the hcp_mmp atlas and 
+        splits data for left and right hemishphere and
+        returns labels_image 
+    ''' 
+
+    # define the mesh for the left and right hemispheres
+    left_coords, left_faces = hcp.mesh["pial_left"]
+    right_coords, right_faces = hcp.mesh["pial_right"]
+    
+    mesh = PolyMesh(
+        left=InMemoryMesh(left_coords, left_faces),
+        right=InMemoryMesh(right_coords, right_faces),
+    )
+
+    # Split the mesh 
+    parc = hcp.mmp
+    right_data = hcp.right_cortex_data(parc.map_all)
+    left_data = hcp.left_cortex_data(parc.map_all)
+    
+    data = {
+        "left": left_data,
+        "right": right_data,
+    }
+    
+    labels_image = SurfaceImage(mesh=mesh, data=data)
+
+    return labels_image
+
+def create_mmp_lookup():
+    ''' Creates and returns a lookup table for the hcp_mmp atlas
+    '''
+    parc = hcp.mmp
+    
+    lut = pd.DataFrame(parc.labels.values(), index=parc.labels.keys(), columns=["name"])
+    lut.iloc[0] = "Background"
+    lut['color'] = parc.rgba.values()
+    lut['index'] = lut.index
+
+    return lut
 
 
 
