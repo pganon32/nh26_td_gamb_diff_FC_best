@@ -92,6 +92,32 @@ def create_mmp_lookup():
     return lut
 
 
+def restore_corr_matrices(vectorized_data_with_ids):
+    ''' 
+    Restore full symmetric correlation matrices from a vectorized upper triangle.
+    
+    Parameters
+    ----------
+    vectorized_data_with_ids : list of 1D arrays
+        First element of an array = participant ID, remaining elements = upper-triangular
+        values of the correlation matrix
+    
+    Returns
+    -------
+    participant_id : the ID (first value)
+    corr_matrix : the reconstructed (n x n) symmetric matrix with 1s on diagonal
+    '''
+    
+    subject_ids = []
+    data = []
+
+    for row in vectorized_data_with_ids:
+        subject_ids.append(str(int(row[0])))
+        temp = vec_to_sym_matrix(row[1:])
+        data.append(temp)
+
+    return subject_ids, corr_matrices
+
 
 
 
