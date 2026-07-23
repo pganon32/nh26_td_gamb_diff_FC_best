@@ -91,6 +91,119 @@ def create_mmp_lookup():
 
     return lut
 
+TR_LEN = 0.72
+VALENCE_LIST = ("win", "loss")
+DIRECTION_LIST = ("RL", "LR")
+
+# -------------------------------------------------------------------------------- # 
+def split_time_series(roi_time_series, patient_num, hcp_base_path, tr_len=TR_LEN,):
+    """
+    Split an RL-then-LR concatenated gambling task time series into separate dfs for win and loss time series.
+
+    Parameters
+    ----------
+    roi_time_series : 
+        Array with shape (total_timepoints, n_rois).
+        direction: RL, LR.
+
+    tr_len : float (TR = 0.72) 
+
+    Returns
+    -------
+    win_time_series : np.ndarray
+        Win-block timepoints from RL and LR.
+
+    loss_time_series : np.ndarray
+        Loss-block timepoints from RL and LR.
+    """
+    
+
+    # coerce func data time series to array and ensure TR*ROI shape 
+    roi_time_series = np.asarray(roi_time_series)
+    if roi_time_series.ndim != 2:
+        raise ValueError("roi_time_series must have shape (timepoints, ROIs).")
+
+    # check that nTRs is correct and calculate nTRs/run
+    n_total_trs = roi_time_series.shape[0]
+    if n_total_trs % 2 != 0:
+        raise ValueError(
+            f"Expected an even number of timepoints, "
+            f"but found {n_total_trs}."
+        )
+    n_trs_per_run = n_total_trs // 2
+
+    # ciis_to_giis() concatenates RL first and LR second.
+    # split into RL and LR time series 
+    run_time_series = {
+        "RL": roi_time_series[:n_trs_per_run, :],
+        "LR": roi_time_series[n_trs_per_run:, :],
+    }
+
+    # instantiate valence blocks for split of time series by valance
+    valence_blocks = {"win": [], "loss": [],}
+
+        
+    for direction in DIRECTION_LIST: 
+        direction_data = run_time_series[direction] # for given direction
+
+        # get time (s) @ start of TR 
+        tr_times = np.arange(n_trs_per_run) * tr_len
+
+        # get block onsets for given valence
+        for valence in VALENCE_LIST:
+
+            ev_path = (
+                hcp_base_path
+                / str(patient_num)
+                / "MNINonLinear"
+                / "Results"
+                / f"tfMRI_GAMBLING_{direction}"
+                / "EVs"
+                / f"{valence}.txt"
+            )
+
+            with ev_path.open("r") as ev_file:
+                onset_df = pd.read_csv(
+                    ev_file,
+                    sep=r"\s+",
+                    header=None,
+                    names=[
+                        "onset",
+                        "duration",
+                        "amplitude",
+                    ],
+                )
+
+            for block in onset_df.itertuples(index=False):
+                # annotate block start and end 
+                block_start = block.onset
+                block_end = block.onset + block.duration
+
+                block_mask = (
+                    (tr_times >= block_start)
+                    & (tr_times < block_end)
+                )
+
+                # split data by task epoch (win or loss) 
+                block_data = direction_data[block_mask, :]
+
+                if block_data.shape[0] == 0:
+                    raise ValueError(
+                        f"No TRs selected for participant "
+                        f"{patient_num}, direction={direction}, "
+                        f"valence={valence}, "
+                        f"onset={block_start}, "
+                        f"duration={block.duration}."
+                    )
+
+                valence_blocks[valence].append(block_data)
+                
+    # concatenate win and loss blocks into one df /valence & return
+    win_time_series = np.vstack(valence_blocks["win"])
+    loss_time_series = np.vstack(valence_blocks["loss"])
+    return win_time_series, loss_time_series
+# -------------------------------------------------------------------------------- # 
+
 
 def restore_corr_matrices(vectorized_data_with_ids):
     ''' 

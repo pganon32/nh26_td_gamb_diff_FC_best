@@ -1,0 +1,17 @@
+
+win_timeseries_df.csv
+loss_timeseries_df.csv
+
+# Generated connectivity outputs
+win_timeseries_df.csv
+loss_timeseries_df.csv
+win_timeseries_df.csv.gz
+loss_timeseries_df.csv.gz
+
+# Local notebook/Python files
+.ipynb_checkpoints/
+__pycache__/
+Untitled.ipynb
+
+win_timeseries_df.csv
+loss_timeseries_df.csv
